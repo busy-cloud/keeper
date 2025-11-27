@@ -121,6 +121,8 @@ func (p *Program) update() error {
 
 func (p *Program) execute() (err error) {
 	attr := &os.ProcAttr{}
+	attr.Env = os.Environ()
+	attr.Dir = config.Cwd
 	attr.Files = append(attr.Files, os.Stdin, os.Stdout, os.Stderr)
 
 	p.process, err = os.StartProcess(config.Binary, config.Arguments, attr)

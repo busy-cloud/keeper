@@ -1,0 +1,63 @@
+version: 2
+project_name: keeper
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    id: "keeper"
+    main: ./cmd
+    binary: "keeper"
+    ldflags:
+      - -s -w -X main.build={{.Version}}
+    goos:
+      - windows
+      - linux
+      #- darwin
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+      #- mips
+      #- mipsle #默认小端
+      #- mips64
+      #- mips64le
+      - loong64 #龙芯
+      #- riscv32
+      #- riscv64
+    goarm:
+      - 6
+      - 7
+    gomips:
+      - hardfloat
+      - softfloat
+    ignore:
+      - goos: linux
+        goarch: "386"
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      - goarch: mips64le
+        gomips: softfloat
+
+archives:
+  - wrap_in_directory: true
+    #name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  use: github-native
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

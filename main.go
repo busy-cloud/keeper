@@ -16,12 +16,12 @@ import (
 
 type Config struct {
 	Name      string   `json:"name,omitempty"`
-	Binary    string   `json:"binary,omitempty"` //二进制文件
-	Update    string   `json:"update,omitempty"` //升级文件
-	Arguments []string `json:"arguments,omitempty"`
-	Cwd       string   `json:"cwd,omitempty"`
-	Delay     int      `json:"delay,omitempty"`
-	Retry     int      `json:"retry,omitempty"`
+	Binary    string   `json:"binary,omitempty"`    //二进制文件
+	Update    string   `json:"update,omitempty"`    //升级文件
+	Arguments []string `json:"arguments,omitempty"` //参数
+	Dir       string   `json:"dir,omitempty"`       //当前目录
+	Delay     int      `json:"delay,omitempty"`     //延迟 s
+	Retry     int      `json:"retry,omitempty"`     //重试 s
 }
 
 var (
@@ -122,7 +122,7 @@ func (p *Program) update() error {
 func (p *Program) execute() (err error) {
 	attr := &os.ProcAttr{}
 	attr.Env = os.Environ()
-	attr.Dir = config.Cwd
+	attr.Dir = config.Dir
 	attr.Files = append(attr.Files, os.Stdin, os.Stdout, os.Stderr)
 
 	p.process, err = os.StartProcess(config.Binary, config.Arguments, attr)
@@ -157,7 +157,16 @@ func (p *Program) run() {
 		config.Retry = 5
 	}
 
+	//切换当前目录，默认是keeper同目录
 	var err error
+	dir := config.Dir
+	if config.Dir == "" {
+		dir = filepath.Dir(os.Args[0])
+	}
+	err = os.Chdir(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//进程守护
 	for !p.closed {

@@ -7,7 +7,7 @@ builds:
   - env:
       - CGO_ENABLED=0
     id: "keeper"
-    main: ./cmd
+    main: .
     binary: "keeper"
     ldflags:
       - -s -w -X main.build={{.Version}}

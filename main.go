@@ -15,12 +15,13 @@ import (
 )
 
 type Config struct {
-	Name      string
-	Command   string
-	Arguments []string
-	Cwd       string
-	Delay     int
-	Retry     int
+	Name      string   `json:"name,omitempty"`
+	Binary    string   `json:"binary,omitempty"` //二进制文件
+	Update    string   `json:"update,omitempty"` //升级文件
+	Arguments []string `json:"arguments,omitempty"`
+	Cwd       string   `json:"cwd,omitempty"`
+	Delay     int      `json:"delay,omitempty"`
+	Retry     int      `json:"retry,omitempty"`
 }
 
 var (
@@ -35,7 +36,13 @@ func init() {
 	flag.BoolVar(&uninstall, "u", false, "卸载服务")
 }
 
-var config Config
+var config Config = Config{
+	Name:   "demo",
+	Binary: "demo",
+	Delay:  5,
+	Retry:  5,
+}
+
 var svc service.Config
 
 func load() error {
@@ -63,6 +70,63 @@ type Program struct {
 	process *os.Process
 }
 
+func (p *Program) update() error {
+	if config.Update == "" {
+		return nil
+	}
+
+	info, err := os.Stat(config.Update)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if info.IsDir() {
+		return nil
+	}
+
+	//清空上次备份
+	_ = os.Remove(config.Binary + ".bak")
+
+	//备份
+	err = os.Rename(config.Binary, config.Binary+".bak")
+	if err != nil {
+		return err
+	}
+
+	//升级
+	err = os.Rename(config.Update, config.Binary)
+	if err != nil {
+		log.Println("升级失败，恢复文件")
+		_ = os.Rename(config.Binary+".bak", config.Binary) //恢复文件
+		_ = os.Remove(config.Update)                       //删除升级文件
+		return err
+	}
+
+	//升级后 启动失败
+	err = p.execute()
+	if err != nil {
+		log.Println(err)
+		log.Println("恢复到之前的文件")
+		_ = os.Remove(config.Binary)
+		_ = os.Rename(config.Binary+".bak", config.Binary)
+	}
+
+	_, _ = p.process.Wait()
+	_ = p.process.Release()
+
+	//等下再重启
+	time.Sleep(time.Second * time.Duration(config.Retry))
+
+	return nil
+}
+
+func (p *Program) execute() (err error) {
+	attr := &os.ProcAttr{}
+	attr.Files = append(attr.Files, os.Stdin, os.Stdout, os.Stderr)
+
+	p.process, err = os.StartProcess(config.Binary, config.Arguments, attr)
+	return err
+}
+
 func (p *Program) run() {
 	// 此处编写具体的服务代码
 	hup := make(chan os.Signal, 2)
@@ -86,23 +150,22 @@ func (p *Program) run() {
 
 	time.Sleep(time.Duration(config.Delay) * time.Second)
 
-	attr := &os.ProcAttr{}
-	attr.Files = append(attr.Files, os.Stdin, os.Stdout, os.Stderr)
-	var err error
-
 	//默认5秒启动一次
 	if config.Retry == 0 {
 		config.Retry = 5
 	}
 
+	var err error
+
 	//进程守护
 	for !p.closed {
-		p.process, err = os.StartProcess(config.Command, config.Arguments, attr)
+		err = p.execute()
 
 		//启动失败重试
 		if err != nil {
-			log.Println(err)
+			log.Println("启动进程失败", err)
 		} else {
+			log.Println("启动进程成功")
 			_, _ = p.process.Wait()
 			_ = p.process.Release()
 			p.process = nil
@@ -110,6 +173,9 @@ func (p *Program) run() {
 
 		//等下再重启
 		time.Sleep(time.Second * time.Duration(config.Retry))
+
+		//重启后才 检查升级
+		err = p.update()
 	}
 }
 
@@ -125,6 +191,12 @@ func (p *Program) Stop(s service.Service) error {
 }
 
 func main() {
+	flag.Parse()
+	if help {
+		flag.Usage()
+		return
+	}
+
 	err := load()
 	if err != nil {
 		log.Fatal(err)

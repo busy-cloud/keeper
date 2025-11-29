@@ -124,8 +124,9 @@ func (p *Program) execute() (err error) {
 	attr.Env = os.Environ()
 	attr.Dir = config.Dir
 	attr.Files = append(attr.Files, os.Stdin, os.Stdout, os.Stderr)
+	args := append([]string{config.Binary}, config.Arguments...)
 
-	p.process, err = os.StartProcess(config.Binary, config.Arguments, attr)
+	p.process, err = os.StartProcess(config.Binary, args, attr)
 	return err
 }
 

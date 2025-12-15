@@ -101,6 +101,8 @@ func (p *Program) update() error {
 		return err
 	}
 
+	_ = os.Chmod(config.Binary, os.ModePerm)
+
 	//升级后 启动失败
 	err = p.execute()
 	if err != nil {

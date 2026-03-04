@@ -101,6 +101,7 @@ func (p *Program) update() error {
 		return err
 	}
 
+	//添加执行权限
 	_ = os.Chmod(config.Binary, os.ModePerm)
 
 	//升级后 启动失败
@@ -111,6 +112,9 @@ func (p *Program) update() error {
 		_ = os.Remove(config.Binary)
 		_ = os.Rename(config.Binary+".bak", config.Binary)
 	}
+
+	// 升级成功，将bak文件按日期备份
+	_ = os.Rename(config.Binary+".bak", config.Binary+time.Now().Format("20060102150405"))
 
 	_, _ = p.process.Wait()
 	_ = p.process.Release()
